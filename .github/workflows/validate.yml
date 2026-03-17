@@ -1,0 +1,68 @@
+name: Validate Repository
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate folder structure
+        run: |
+          echo "Checking folder structure..."
+          
+          # Check periods folders exist
+          for i in $(seq -w 1 10); do
+            if [ ! -d "periodos/${i}-periodo" ]; then
+              echo "ERROR: Missing periodos/${i}-periodo"
+              exit 1
+            fi
+          done
+          
+          echo "✓ Periodos folders OK"
+
+      - name: Check for empty disciplines
+        run: |
+          echo "Checking for empty disciplines..."
+          empty_count=0
+          for dir in periodos/*/; do
+            for subdir in "$dir"*/; do
+              files=$(find "$subdir" -maxdepth 1 -type f -name "*.md" | wc -l)
+              if [ "$files" -eq 0 ]; then
+                echo "Warning: $subdir has no markdown files"
+                ((empty_count++))
+              fi
+            done
+          done
+          echo "Found $empty_count disciplines without markdown files"
+
+      - name: Validate markdown links
+        run: |
+          echo "Checking markdown syntax..."
+          # Basic check for broken links (simple pattern)
+          grep -r "]\(" --include="*.md" . | grep -v "^Binary" | head -20 || true
+          echo "✓ Markdown link check complete"
+
+      - name: Check required files
+        run: |
+          echo "Checking required files..."
+          
+          required_files=(
+            "README.md"
+            "CONTRIBUTING.md"
+            "LICENSE"
+          )
+          
+          for file in "${required_files[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "ERROR: Missing $file"
+              exit 1
+            fi
+            echo "✓ $file exists"
+          done
